@@ -6,7 +6,7 @@ import time
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from utils.model_loader_new import ModelLoadError, load_image_model
+from utils.hf_loader import ModelLoadError, load_image_model
 from utils.predict import fuse_predictions, predict_image, predict_text
 from utils.preprocess import preprocess_image, preprocess_text
 
@@ -37,7 +37,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,9 +65,12 @@ def health():
 async def predict(
     headline: str = Form(...),
     file: UploadFile = File(...),
+    w_text: float = Form(0.6),
+    w_image: float = Form(0.4),
 ) -> dict[str, str | float]:
 
     logging.info(f"Received headline: {headline}")
+    logging.info(f"Weights -> text: {w_text}, image: {w_image}")
 
     image_model: Any | None = getattr(app.state, "image_model", None)
     if image_model is None:
@@ -86,7 +89,13 @@ async def predict(
         text_score = predict_text(processed_headline)
         image_score = predict_image(image_array, image_model)
 
-        label, confidence = fuse_predictions(text_score, image_score)
+        
+        label, confidence = fuse_predictions(
+            text_score,
+            image_score,
+            w_text=w_text,
+            w_image=w_image
+        )
 
         end_time = time.time()
         logging.info(f"Prediction took {end_time - start_time:.2f} seconds")

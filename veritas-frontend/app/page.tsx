@@ -31,7 +31,7 @@ export default function Home() {
 
     try {
       const res = await fetch(
-        "https://amandekate-veritas-api.hf.space/predict",
+        `${process.env.NEXT_PUBLIC_API_URL}/predict`,
         {
           method: "POST",
           body: formData,

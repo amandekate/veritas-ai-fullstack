@@ -1,30 +1,36 @@
 import numpy as np
+import requests
 from typing import Any
 
 
+TEXT_API_URL = "https://amandekate-veritas-text-api.hf.space/predict"
+
+
 def _clip_probability(value: float) -> float:
-    """
-    Ensure probability stays between 0 and 1
-    """
+   
     return float(np.clip(value, 0.0, 1.0))
 
 
 def predict_text(headline: str) -> float:
-    """
-    Mock text prediction (since BERT model is not loaded)
+   
+    try:
+        response = requests.post(
+            TEXT_API_URL,
+            json={"text": headline},
+            timeout=15
+        )
 
-    Returns probability of FAKE news
-    """
-    headline = headline.lower()
+        if response.status_code != 200:
+            print("Text API failed:", response.text)
+            return 0.5
 
-    if "breaking" in headline or "shocking" in headline:
-        return 0.8
-    elif "official" in headline or "confirmed" in headline:
-        return 0.2
-    elif "fake" in headline or "rumor" in headline:
-        return 0.9
+        data = response.json()
 
-    return 0.5
+        return _clip_probability(float(data.get("score", 0.5)))
+
+    except Exception as e:
+        print("Text API error:", e)
+        return 0.5
 
 
 def predict_image(image_array: np.ndarray, model: Any) -> float:
@@ -35,7 +41,6 @@ def predict_image(image_array: np.ndarray, model: Any) -> float:
 
     prediction = np.asarray(raw_prediction).squeeze()
 
-    # Handle different output shapes
     if prediction.ndim == 0:
         score = float(prediction)
 
@@ -43,7 +48,6 @@ def predict_image(image_array: np.ndarray, model: Any) -> float:
         if prediction.size == 1:
             score = float(prediction[0])
         elif prediction.size >= 2:
-            # Assuming index 1 = FAKE class
             score = float(prediction[1])
         else:
             score = float(prediction[0])
@@ -51,7 +55,6 @@ def predict_image(image_array: np.ndarray, model: Any) -> float:
     else:
         score = float(prediction.reshape(-1)[0])
 
-    # Convert logits to probability if needed
     if score < 0.0 or score > 1.0:
         score = 1 / (1 + np.exp(-score))
 
